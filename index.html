@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kurt's Jeep">
+<meta name="theme-color" content="#e9b57a">
+<style>body{margin:0}[hidden]{display:none!important}*{-webkit-tap-highlight-color:transparent}</style>
+<title>Kurt's Jeep</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chivo+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: full-screen 3D junkyard, HUD pinned to the corners, story cards over the scene. Single dusk look on purpose. */
+:root{
+  --sky:#e9b57a; --ink:#2a1c12; --panel:#2f2117f2; --cream:#f6e7c8;
+  --mustard:#e8b130; --olive:#6f7d3c; --muted:#c9b48f;
+  --display:"Bungee","Arial Black",Impact,sans-serif;
+  --mono:"Chivo Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--sky);color:var(--cream);font-family:var(--mono)}
+#stage{position:fixed;inset:0;touch-action:none;-webkit-user-select:none;user-select:none}
+#stage canvas{display:block;width:100%;height:100%}
+.hud{position:fixed;left:0;right:0;top:0;pointer-events:none;display:flex;flex-direction:column;gap:8px;
+  padding-top:calc(12px + env(safe-area-inset-top,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hud-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.brand{font-family:var(--display);font-size:20px;color:var(--ink);letter-spacing:.02em}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;color:var(--ink);background:#f6e7c8cc;padding:2px 10px;border-radius:6px}
+.parts{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:4px;background:#2f2117bb;color:var(--muted);border:1px solid transparent}
+.chip.carry{border-color:var(--mustard);color:var(--mustard)}
+.chip.done{background:var(--olive);color:var(--cream)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom,0px));
+  max-width:min(420px,calc(100% - 32px));background:var(--panel);color:var(--cream);padding:10px 14px;border-radius:8px;
+  font-size:14px;line-height:1.4;pointer-events:none;opacity:0;transition:opacity .25s}
+.toast.show{opacity:1}
+.toast b{color:var(--mustard);font-weight:700}
+.bubble{position:fixed;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;max-width:210px;width:max-content;
+  background:#fffaf0;color:var(--ink);border:2px solid var(--ink);border-radius:14px;padding:6px 11px;font-weight:700;font-size:14px;line-height:1.3;text-align:center}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-9px;margin-left:-7px;width:12px;height:12px;background:#fffaf0;
+  border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg)}
+.bubble.pop{animation:pop .22s ease-out}
+@keyframes pop{from{transform:translate(-50%,-100%) scale(.6)}to{transform:translate(-50%,-100%) scale(1)}}
+@media (prefers-reduced-motion:reduce){.bubble.pop{animation:none}}
+.joy{position:fixed;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px solid #2a1c1255;background:#f6e7c833;pointer-events:none}
+.joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:#2a1c12aa}
+.overlay{position:fixed;inset:0;display:grid;place-items:center;background:#2a1c1266;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px}
+.card{background:var(--panel);max-width:420px;width:100%;border-radius:12px;padding:24px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px #0006}
+.card h1{font-family:var(--display);font-size:clamp(30px,8vw,42px);line-height:1;margin:0;color:var(--mustard);text-wrap:balance}
+.card .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.card p{margin:0;font-size:14px;line-height:1.55;color:var(--cream)}
+.card .hint{font-size:12px;color:var(--muted)}
+.stats{display:flex;gap:24px;font-variant-numeric:tabular-nums}
+.stats div{display:flex;flex-direction:column;gap:2px}
+.stats span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.stats strong{font-size:26px;color:var(--cream)}
+button{font-family:var(--display);font-size:18px;background:var(--mustard);color:var(--ink);border:0;border-radius:8px;padding:12px 18px;cursor:pointer;align-self:flex-start}
+button:focus-visible{outline:3px solid var(--cream);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud">
+  <div class="hud-top"><div class="brand">Kurt's Jeep</div><div class="timer" id="timer">0:00</div></div>
+  <div class="parts" id="parts"></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="bubble" id="bubble" hidden></div>
+<div class="joy" id="joy" hidden><i id="knob"></i></div>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <div class="eyebrow">Dale's Junkyard · Sundown</div>
+    <h1>Kurt's Jeep</h1>
+    <p>Kurt is 78, stubborn as a fence post, and his knee hurts. He will tell you about it. He came straight from the gym, and his '74 Jeep is sitting on cinder blocks, leaking oil again. Six parts are scattered across the junkyard. Haul them back one at a time.</p>
+    <p>Watch out for Rusty, Dale's dog. He chases anything Kurt is carrying, and heavy parts slow the old man down.</p>
+    <p class="hint">WASD or arrow keys. On a phone, drag anywhere to walk. Follow the yellow arrow.</p>
+    <button id="startBtn">Get to work</button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="card">
+    <div class="eyebrow">She runs</div>
+    <h1>Kurt's back on the road</h1>
+    <p id="winLine">Not bad for an old timer.</p>
+    <div class="stats">
+      <div><span>Time</span><strong id="winTime">0:00</strong></div>
+      <div><span>Best</span><strong id="bestTime">0:00</strong></div>
+      <div><span>Steals</span><strong id="steals">0</strong></div>
+    </div>
+    <button id="againBtn">Wreck it, build it again</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const C={sand:0xd9a86c,sand2:0xc89358,dark:0x2b2620,olive:0x6f7d3c,olive2:0x5d6a31,metal:0x8a8f93,rust:0xa5532c,
+  brown:0x6b4226,concrete:0x9a948a,skin:0xe8b98f,beard:0xcfc6b8,flannel:0xa8432f,denim:0x3e5778,cap:0x2f4f3a,
+  dog:0x9b5b2e,dogDark:0x5a3218,rock:0xa88a6a,cactus:0x5f7d43,tire:0x222222,glass:0xfff1a8,mustard:0xe8b130,
+  skinDark:0xd49a72,lens:0xbfe0ea,hair:0x6b4428,hair2:0x4e301b,shirt:0x2f6fa8,shorts:0xc23b2f,white:0xf4f1ea,boot:0x4a3020,red:0xb3352a,blue:0x3f6b8c,
+  mesa:0xc4774a,mesa2:0xa85f3a,wood:0x8a6a48,tin:0x9aa3a6,tuft:0xa99a4e,weed:0x9c7a44};
+
+const PARTS=[
+ {type:'engine',label:'Engine',weight:.6,quip:"Straight-six. They don't build 'em like this anymore."},
+ {type:'wheels',label:'Wheels',weight:.72,quip:"Four tires, only one of 'em flat. Good enough."},
+ {type:'hood',label:'Hood',weight:.85,quip:"Little hail damage. Adds horsepower."},
+ {type:'seat',label:'Seat',weight:.9,quip:"Spring's poking out. I call that character."},
+ {type:'steering',label:'Steering',weight:1,quip:"Steering is optional. Okay, not really."},
+ {type:'lights',label:'Headlights',weight:1,quip:"Gotta see the deer before they see me."}
+];
+
+// ---------- renderer ----------
+const stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+renderer.shadowMap.enabled=true;
+stage.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xe9b57a);
+scene.fog=new THREE.Fog(0xe9b57a,38,90);
+const camera=new THREE.PerspectiveCamera(50,1,.1,200);
+scene.add(new THREE.HemisphereLight(0xffe2b8,0x6b4a2e,.75));
+const sun=new THREE.DirectionalLight(0xffcf98,.95);
+sun.position.set(30,42,18);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-60,right:60,top:60,bottom:-60,near:1,far:140});
+scene.add(sun);
+
+const matCache={};
+function mat(c,extra){const k=c+(extra?'e':'');if(!matCache[k])matCache[k]=new THREE.MeshStandardMaterial(Object.assign({color:c,flatShading:true,roughness:1,metalness:0},extra||{}));return matCache[k];}
+function mesh(geo,c,x=0,y=0,z=0,extra){const m=new THREE.Mesh(geo,mat(c,extra));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;return m;}
+function bx(w,h,d,c,x,y,z){return mesh(new THREE.BoxGeometry(w,h,d),c,x,y,z);}
+function cyl(r,h,c,x,y,z,seg=8){return mesh(new THREE.CylinderGeometry(r,r,h,seg),c,x,y,z);}
+
+// ---------- terrain ----------
+(function(){
+  const g=new THREE.PlaneGeometry(170,170,50,50);g.rotateX(-Math.PI/2);
+  const p=g.attributes.position;
+  for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),d=Math.hypot(x,z);
+    let y=Math.random()*.15; if(d>50)y+=(d-50)*(.25+Math.random()*.35)+Math.random()*.8; p.setY(i,y);}
+  g.computeVertexNormals();
+  const m=new THREE.Mesh(g,mat(C.sand));m.receiveShadow=true;scene.add(m);
+})();
+
+// ---------- obstacles ----------
+const obstacles=[];
+function rand(a,b){return a+Math.random()*(b-a);}
+function addObstacle(group,x,z,r){group.position.set(x,0,z);scene.add(group);obstacles.push({x,z,r});}
+function rock(){const g=new THREE.Group();const s=rand(.8,2);const m=mesh(new THREE.DodecahedronGeometry(s,0),C.rock,0,s*.5,0);m.rotation.set(rand(0,3),rand(0,3),0);g.add(m);return [g,s*.9];}
+function cactus(){const g=new THREE.Group();const h=rand(2,3.4);g.add(cyl(.3,h,C.cactus,0,h/2,0,6));
+  const a=cyl(.2,.9,C.cactus,.5,h*.55,0,6);a.rotation.z=Math.PI/2;g.add(a);g.add(cyl(.2,.8,C.cactus,.85,h*.55+.4,0,6));return [g,.6];}
+function tires(){const g=new THREE.Group();const n=2+Math.floor(Math.random()*3);for(let i=0;i<n;i++){const t=cyl(.7,.35,C.tire,rand(-.1,.1),.18+i*.36,rand(-.1,.1),8);t.rotation.y=rand(0,1);g.add(t);}return [g,.9];}
+function husk(){const g=new THREE.Group();const c=[C.rust,0x7a8a92,0x8b6a3a][Math.floor(Math.random()*3)];
+  g.add(bx(3.4,.9,1.7,c,0,.55,0));g.add(bx(1.6,.7,1.5,c,-.3,1.35,0));g.add(bx(.4,.4,.3,C.tire,1.1,.2,.9));g.add(bx(.4,.4,.3,C.tire,-1.1,.2,-.9));
+  g.rotation.y=rand(0,Math.PI);const k=g.children[0];k.rotation.z=rand(-.08,.08);return [g,2];}
+function barrels(){const g=new THREE.Group();const n=1+Math.floor(Math.random()*3);for(let i=0;i<n;i++){const c=[C.blue,C.rust,C.mustard,C.red][Math.floor(Math.random()*4)];
+  const b=cyl(.42,1.2,c,(i%2)*.8-.3,.6,Math.floor(i/2)*.8,8);g.add(b);g.add(cyl(.44,.06,C.dark,b.position.x,.95,b.position.z,8));g.add(cyl(.44,.06,C.dark,b.position.x,.3,b.position.z,8));}
+  if(Math.random()>.5){const k=cyl(.42,1.2,C.rust,1.2,.42,-.4,8);k.rotation.z=Math.PI/2;g.add(k);}return [g,1.2];}
+function stack(){const g=new THREE.Group();const n=2+Math.floor(Math.random()*3);for(let i=0;i<n;i++){const c=[C.rust,0x7a8a92,0x8b6a3a,C.blue,0x6d4c6a][Math.floor(Math.random()*5)];
+  const s=bx(3,.55,1.6,c,rand(-.15,.15),.28+i*.56,rand(-.15,.15));s.rotation.y=rand(-.2,.2);g.add(s);g.add(bx(.6,.2,1.3,0x3a3a3a,s.position.x-.9,s.position.y+.15,s.position.z));}return [g,1.9];}
+const makers=[rock,cactus,tires,husk,barrels,stack,rock,barrels];
+// Dale's shack
+{const g=new THREE.Group();g.add(bx(4,2.6,3,C.wood,0,1.3,0));const r=bx(4.6,.15,3.8,C.tin,0,2.85,0);r.rotation.x=.18;g.add(r);
+ g.add(bx(.9,1.7,.08,C.dark,.8,.85,1.52));g.add(bx(.9,.6,.06,C.lens,-.9,1.6,1.52));
+ const sign=bx(2.6,.6,.08,C.cream||0xf6e7c8,0,3.4,1.2);g.add(sign);g.add(bx(.1,.8,.1,C.dark,-1,3,1.2));g.add(bx(.1,.8,.1,C.dark,1,3,1.2));
+ g.add(bx(1.4,.1,.08,C.red,0,3.45,1.25));g.add(bx(1.8,.08,.08,C.dark,0,3.3,1.25));
+ g.rotation.y=.5;addObstacle(g,-15,-12,3);}
+// water tower
+{const g=new THREE.Group();[[-1.2,-1.2],[1.2,-1.2],[-1.2,1.2],[1.2,1.2]].forEach(([x,z])=>g.add(bx(.2,6,.2,C.wood,x,3,z)));
+ g.add(cyl(1.9,2.4,C.tin,0,7.2,0,8));const roof=mesh(new THREE.ConeGeometry(2.1,1.2,8),C.rust,0,9,0);g.add(roof);g.add(bx(2.6,.12,2.6,C.wood,0,6,0));
+ addObstacle(g,30,-28,2);}
+// mesas and sun beyond the fence
+for(let i=0;i<14;i++){const a=i/14*Math.PI*2+rand(-.15,.15),d=rand(72,86),h=rand(5,13),r=rand(5,11);
+  const m=mesh(new THREE.CylinderGeometry(r*.7,r,h,6+Math.floor(Math.random()*3)),i%2?C.mesa:C.mesa2,Math.cos(a)*d,h/2,Math.sin(a)*d);m.rotation.y=rand(0,3);scene.add(m);}
+{const s=new THREE.Mesh(new THREE.CircleGeometry(9,10),new THREE.MeshBasicMaterial({color:0xffd27a,fog:false}));s.position.set(-40,22,-110);scene.add(s);}
+const clouds=[];for(let i=0;i<9;i++){const g=new THREE.Group();const n=3+Math.floor(Math.random()*3);
+  for(let j=0;j<n;j++){const p=mesh(new THREE.DodecahedronGeometry(rand(1.6,2.6),0),0xfbe6d0,j*2.2-n,rand(-.4,.4),rand(-1,1));p.scale.y=.55;p.castShadow=false;g.add(p);}
+  g.position.set(rand(-70,70),rand(24,32),rand(-80,30));scene.add(g);clouds.push(g);}
+for(let i=0;i<90;i++){const a=rand(0,Math.PI*2),d=rand(4,49);const g=new THREE.Group();
+  for(let j=0;j<3;j++){const t=mesh(new THREE.ConeGeometry(.12,rand(.35,.6),3),C.tuft,rand(-.2,.2),.2,rand(-.2,.2));t.rotation.z=rand(-.3,.3);t.castShadow=false;g.add(t);}
+  g.position.set(Math.cos(a)*d,0,Math.sin(a)*d);scene.add(g);}
+const weeds=[];for(let i=0;i<4;i++){const w=mesh(new THREE.IcosahedronGeometry(.55,0),C.weed,rand(-40,40),.55,rand(-40,40));
+  w.material=new THREE.MeshStandardMaterial({color:C.weed,wireframe:true});scene.add(w);weeds.push({m:w,v:rand(2,4)});}
+// dust puffs
+const puffs=[];for(let i=0;i<14;i++){const p=new THREE.Mesh(new THREE.IcosahedronGeometry(.18,0),new THREE.MeshStandardMaterial({color:0xe6c597,flatShading:true,transparent:true,opacity:0}));
+  scene.add(p);puffs.push({m:p,life:0});}
+let puffI=0,puffT=0;
+function puff(x,z){const p=puffs[puffI++%puffs.length];p.life=1;p.m.position.set(x+rand(-.2,.2),.15,z+rand(-.2,.2));p.m.scale.setScalar(1);}
+for(let i=0;i<34;i++){
+  let x,z,tries=0;do{const a=rand(0,Math.PI*2),d=rand(8,47);x=Math.cos(a)*d;z=Math.sin(a)*d;tries++;}
+  while(tries<20&&obstacles.some(o=>Math.hypot(o.x-x,o.z-z)<o.r+4));
+  const [g,r]=makers[i%makers.length]();addObstacle(g,x,z,r);
+}
+// fence posts at the edge
+for(let i=0;i<48;i++){const a=i/48*Math.PI*2;scene.add(bx(.25,1.6,.25,C.brown,Math.cos(a)*52,.8,Math.sin(a)*52));}
+
+// ---------- part models ----------
+function makePart(t){
+  const g=new THREE.Group();
+  if(t==='engine'){g.add(bx(.9,.55,.7,C.metal,0,.28,0));g.add(bx(.7,.2,.5,C.dark,0,.65,0));for(let i=0;i<3;i++)g.add(bx(.12,.15,.12,C.rust,-.25+i*.25,.83,0));}
+  if(t==='wheels'){for(let i=0;i<2;i++){g.add(cyl(.5,.3,C.tire,0,.15+i*.32,0));g.add(cyl(.2,.32,C.metal,0,.15+i*.32,0,6));}}
+  if(t==='hood'){g.add(bx(1.2,.1,1,C.olive,0,.1,0));g.add(bx(1.2,.11,.18,C.olive2,0,.11,0));}
+  if(t==='seat'){g.add(bx(.8,.2,.7,C.brown,0,.12,0));g.add(bx(.8,.7,.15,C.brown,0,.5,-.3));}
+  if(t==='steering'){const w=mesh(new THREE.TorusGeometry(.35,.07,4,8),C.dark,0,.45,0);g.add(w);const c=cyl(.05,.5,C.metal,0,.2,0,5);g.add(c);}
+  if(t==='lights'){g.add(bx(1,.12,.15,C.metal,0,.3,0));[-.35,.35].forEach(x=>{const l=mesh(new THREE.CylinderGeometry(.18,.18,.16,8),C.glass,x,.3,.1,{emissive:0x7a6a10});l.rotation.x=Math.PI/2;g.add(l);});}
+  return g;
+}
+
+// ---------- the jeep ----------
+const jeep=new THREE.Group();scene.add(jeep);
+jeep.add(bx(3.8,.25,1.6,C.dark,0,.75,0));
+jeep.add(bx(2,.75,1.8,C.olive,-.75,1.25,0));
+jeep.add(bx(.4,.6,1.8,C.olive,.45,1.2,0));
+jeep.add(bx(.12,.65,1.3,C.olive2,1.9,1.15,0));
+[-.95,.95].forEach(z=>jeep.add(bx(1.5,.08,.35,C.olive,1.15,1.12,z)));
+[-.8,.8].forEach(z=>jeep.add(bx(.08,.75,.08,C.dark,.62,1.85,z)));
+jeep.add(bx(.08,.08,1.68,C.dark,.62,2.22,0));
+jeep.add(bx(.22,.2,2.1,C.dark,2.02,.82,0));jeep.add(bx(.18,.2,1.9,C.dark,-1.85,.82,0));
+for(let i=0;i<6;i++)jeep.add(bx(.03,.42,.08,C.dark,1.97,1.12,-.5+i*.2));
+[-.85,.85].forEach(z=>{jeep.add(bx(.1,1.05,.1,C.dark,-1.15,2.1,z));jeep.add(bx(.08,.32,.12,C.red,-1.76,1.35,z*.95));});
+jeep.add(bx(.1,.1,1.8,C.dark,-1.15,2.62,0));
+jeep.add(bx(.25,.35,.18,C.red,-1.55,1.82,-.65));
+{const m=bx(.04,.16,.12,C.metal,.66,1.95,-.98);jeep.add(m);}
+jeep.add(bx(1.8,.04,.06,0x4b5524,-.75,1.45,.91));jeep.add(bx(1.8,.04,.06,0x4b5524,-.75,1.45,-.91));
+const blocks=[];[[-1.25,-.6],[-1.25,.6],[1.25,-.6],[1.25,.6]].forEach(([x,z])=>{const b=bx(.5,.62,.4,C.concrete,x,.31,z);blocks.push(b);jeep.add(b);});
+const installed={};
+installed.wheels=new THREE.Group();
+[[-1.25,-.95],[-1.25,.95],[1.25,-.95],[1.25,.95]].forEach(([x,z])=>{const w=new THREE.Group();w.position.set(x,.55,z);
+  const t=cyl(.55,.4,C.tire,0,0,0);t.rotation.x=Math.PI/2;w.add(t);const h=cyl(.22,.42,C.metal,0,0,0,6);h.rotation.x=Math.PI/2;w.add(h);installed.wheels.add(w);});
+{const sp=new THREE.Group();sp.userData.spare=true;sp.position.set(-2.02,1.35,0);sp.rotation.z=Math.PI/2;
+ sp.add(cyl(.5,.3,C.tire,0,0,0));sp.add(cyl(.2,.32,C.metal,0,0,0,6));installed.wheels.add(sp);}
+installed.engine=new THREE.Group();installed.engine.add(bx(.9,.45,1,C.metal,1.2,1.05,0));installed.engine.add(bx(.5,.15,.6,C.dark,1.2,1.3,0));
+installed.hood=new THREE.Group();installed.hood.add(bx(1.3,.1,1.75,C.olive,1.22,1.43,0));
+installed.seat=new THREE.Group();installed.seat.add(bx(.6,.15,.6,C.brown,-.45,1.7,.42));installed.seat.add(bx(.15,.65,.6,C.brown,-.78,1.98,.42));
+installed.steering=new THREE.Group();{const w=mesh(new THREE.TorusGeometry(.26,.05,4,8),C.dark,.15,1.95,.42);w.rotation.y=Math.PI/2;w.rotation.x=.5;installed.steering.add(w);
+  const c=cyl(.04,.6,C.metal,.35,1.75,.42,5);c.rotation.z=.9;installed.steering.add(c);}
+installed.lights=new THREE.Group();[-.48,.48].forEach(z=>{const l=mesh(new THREE.CylinderGeometry(.17,.17,.12,8),C.glass,1.98,1.25,z,{emissive:0xffcc33});l.rotation.z=Math.PI/2;installed.lights.add(l);});
+Object.values(installed).forEach(g=>{g.visible=false;jeep.add(g);});
+obstacles.push({x:0,z:0,r:2.2});
+const oil=new THREE.Mesh(new THREE.CircleGeometry(1,9),new THREE.MeshStandardMaterial({color:0x15110d,roughness:.15,metalness:.4,flatShading:true}));
+oil.rotation.x=-Math.PI/2;oil.position.set(1.1,.04,.1);oil.scale.set(1.3,.9,1);oil.receiveShadow=true;scene.add(oil);
+{const d=new THREE.Mesh(new THREE.CircleGeometry(.35,7),oil.material);d.rotation.x=-Math.PI/2;d.position.set(2.5,.04,-.6);scene.add(d);}
+
+// ---------- Kurt ----------
+function limb(w,h,d,c,px,py,pz){const p=new THREE.Group();p.position.set(px,py,pz);p.add(bx(w,h,d,c,0,-h/2,0));return p;}
+const kurt=new THREE.Group();scene.add(kurt);
+const body=new THREE.Group();kurt.add(body);
+// 80s gym kit: short red shorts, bare shins, striped tube socks, white sneakers
+function gymLeg(x){const p=new THREE.Group();p.position.set(x,.72,0);
+  p.add(bx(.29,.32,.31,C.shorts,0,-.16,0));p.add(bx(.22,.2,.22,C.skin,0,-.42,0));
+  p.add(bx(.23,.18,.23,C.white,0,-.6,0));p.add(bx(.24,.04,.24,C.shorts,0,-.55,0));
+  p.add(bx(.3,.14,.44,C.white,0,-.69,.07));p.add(bx(.31,.04,.45,C.shorts,0,-.74,.07));return p;}
+const legL=gymLeg(-.17),legR=gymLeg(.17);body.add(legL,legR);
+const torso=new THREE.Group();torso.position.y=.72;torso.rotation.x=.18;body.add(torso);
+torso.add(bx(.72,.8,.45,C.shirt,0,.4,0));torso.add(bx(.73,.08,.46,C.white,0,.62,0));torso.add(bx(.74,.12,.47,C.shorts,0,.06,0));
+torso.add(bx(.74,.12,.47,C.dark,0,.05,0));
+torso.add(bx(.6,.36,.14,C.shirt,0,.3,.25));torso.add(bx(.18,.18,.02,C.white,0,.58,.235));torso.add(bx(.3,.12,.04,0x24578a,0,.4,.31));
+torso.add(bx(.48,.08,.48,C.shorts,0,1.21,0));
+torso.add(bx(.46,.44,.44,C.skin,0,1.04,0));
+torso.add(bx(.05,.12,.09,C.skin,-.255,1.04,0));torso.add(bx(.05,.12,.09,C.skin,.255,1.04,0));
+torso.add(bx(.08,.11,.09,C.skinDark,0,1.01,.26));
+torso.add(bx(.42,.24,.12,C.beard,0,.88,.22));torso.add(bx(.3,.07,.07,C.beard,0,.96,.26));
+[-.1,.1].forEach(x=>{torso.add(bx(.15,.11,.03,C.dark,x,1.1,.235));torso.add(bx(.1,.06,.035,C.lens,x,1.1,.24));torso.add(bx(.15,.05,.05,C.beard,x,1.19,.23));});
+torso.add(bx(.06,.02,.03,C.dark,0,1.11,.24));
+// curly grey hair: a mop of little low-poly curls around the top, sides and back
+const hair=new THREE.Group();hair.position.set(0,1.04,0);torso.add(hair);
+{let seed=11;const sr=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};const hg=new THREE.IcosahedronGeometry(1,0);
+ for(let i=0;i<70;i++){const th=sr()*Math.PI*2,ph=sr()*1.35;const x=Math.sin(ph)*Math.cos(th),y=Math.cos(ph),z=Math.sin(ph)*Math.sin(th);
+  if(z>.3&&y<.8)continue;const m=mesh(hg,sr()>.45?C.hair:C.hair2,x*.27,y*.24+.06,z*.27);m.scale.setScalar(.07+sr()*.06);m.rotation.set(sr()*3,sr()*3,0);hair.add(m);}}
+function gymArm(x){const p=new THREE.Group();p.position.set(x,.75,0);
+  p.add(bx(.24,.26,.26,C.shirt,0,-.13,0));p.add(bx(.17,.42,.18,C.skin,0,-.47,0));
+  p.add(bx(.2,.08,.21,C.shorts,0,-.62,0));p.add(bx(.18,.13,.2,C.skin,0,-.73,0));return p;}
+const armL=gymArm(-.47),armR=gymArm(.47);torso.add(armL,armR);
+const cane=cyl(.04,1.1,C.brown,0,-.75,.05,5);armR.add(cane);
+const carryHolder=new THREE.Group();carryHolder.position.set(0,2.5,.1);kurt.add(carryHolder);
+
+// ---------- Rusty ----------
+const dog=new THREE.Group();scene.add(dog);
+dog.add(bx(.45,.4,1,C.dog,0,.55,0));
+dog.add(bx(.38,.36,.4,C.dog,0,.85,.6));dog.add(bx(.42,.09,.12,C.red,0,.72,.42));dog.add(bx(.08,.08,.03,C.mustard,0,.64,.48));
+dog.add(bx(.12,.12,.04,C.dark,0,.84,.98));dog.add(bx(.2,.16,.22,C.dogDark,0,.78,.88));
+dog.add(bx(.1,.18,.08,C.dogDark,-.14,1.08,.55));dog.add(bx(.1,.18,.08,C.dogDark,.14,1.08,.55));
+const dogLegs=[];[[-.15,.35],[.15,.35],[-.15,-.35],[.15,-.35]].forEach(([x,z])=>{const l=limb(.12,.38,.12,C.dogDark,x,.38,z);dogLegs.push(l);dog.add(l);});
+const tail=limb(.08,.35,.08,C.dog,0,.7,-.5);tail.rotation.x=-2.2;dog.add(tail);
+
+// ---------- pickups ----------
+const beamGeo=new THREE.CylinderGeometry(.35,.35,16,6,1,true);
+const beamMat=new THREE.MeshBasicMaterial({color:C.mustard,transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide});
+const pickups=PARTS.map(p=>{const root=new THREE.Group();const model=makePart(p.type);root.add(model);
+  const beam=new THREE.Mesh(beamGeo,beamMat);beam.position.y=8;root.add(beam);scene.add(root);
+  return Object.assign({},p,{root,model,x:0,z:0,state:'world'});});
+
+const arrow=new THREE.Group();{const c=new THREE.Mesh(new THREE.ConeGeometry(.32,.8,3),new THREE.MeshBasicMaterial({color:C.mustard}));c.rotation.x=Math.PI/2;c.position.z=1.7;arrow.add(c);}
+scene.add(arrow);
+
+// ---------- HUD ----------
+const $=id=>document.getElementById(id);
+const partsEl=$('parts');
+pickups.forEach(p=>{const s=document.createElement('span');s.className='chip';s.textContent=p.label;p.chip=s;partsEl.appendChild(s);});
+let toastT=0;
+function say(html,secs=2.8){const t=$('toast');t.innerHTML=html;t.classList.add('show');toastT=secs;}
+const bubble=$('bubble');let bubbleT=0;
+const KNEE=["My knee hurts.","Oh, my knee hurts.","My knee hurts!","My knee... hurts.","Rain's coming. My knee hurts.","Did I mention my knee hurts?","Ow. My knee hurts."];
+function kurtSay(text,secs=2.6){bubble.textContent=text;bubble.hidden=false;bubble.classList.remove('pop');void bubble.offsetWidth;bubble.classList.add('pop');bubbleT=secs;}
+function knee(){kurtSay(KNEE[Math.floor(Math.random()*KNEE.length)]);}
+function fmt(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+// ---------- state ----------
+const S={oilT:12,kneeT:6,idle:0,kneeSaid:false,running:false,won:false,time:0,carry:null,delivered:0,stun:0,steals:0,winT:0,facing:0,walk:0};
+const D={x:-22,z:24,tx:0,tz:0,cool:0,mode:'wander',walk:0};
+
+function reset(){
+  S.running=false;S.won=false;S.time=0;S.carry=null;S.delivered=0;S.stun=0;S.steals=0;S.winT=0;
+  if(kurt.parent!==scene){scene.add(kurt);}
+  kurt.position.set(0,0,5);kurt.rotation.set(0,0,0);S.facing=Math.PI;S.kneeT=6;S.idle=0;S.kneeSaid=false;torso.rotation.x=.18;armR.rotation.z=0;
+  carryHolder.clear();armL.rotation.x=armR.rotation.x=0;
+  jeep.position.set(0,0,0);jeep.rotation.set(0,0,0);
+  Object.values(installed).forEach(g=>{g.visible=false;g.scale.set(1,1,1);});oil.scale.set(1.3,.9,1);S.oilT=12;blocks.forEach(b=>b.visible=true);
+  const off=Math.random()*Math.PI*2;
+  pickups.forEach((p,i)=>{let x,z,t=0;do{const a=off+i/pickups.length*Math.PI*2+rand(-.3,.3),d=rand(20,43);x=Math.cos(a)*d;z=Math.sin(a)*d;t++;}
+    while(t<30&&obstacles.some(o=>Math.hypot(o.x-x,o.z-z)<o.r+1.6));
+    p.x=x;p.z=z;p.state='world';p.root.visible=true;p.root.position.set(x,0,z);p.chip.className='chip';});
+  D.x=-22;D.z=24;D.cool=0;D.mode='wander';pickWander();
+  $('timer').textContent='0:00';
+}
+function pickWander(){const a=rand(0,Math.PI*2),d=rand(6,40);D.tx=Math.cos(a)*d;D.tz=Math.sin(a)*d;}
+
+// ---------- input ----------
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code.startsWith('Arrow'))e.preventDefault();});
+addEventListener('keyup',e=>{keys[e.code]=false;});
+const joy={id:null,sx:0,sy:0,x:0,y:0};const joyEl=$('joy'),knob=$('knob');
+stage.addEventListener('pointerdown',e=>{if(!S.running)return;joy.id=e.pointerId;joy.sx=e.clientX;joy.sy=e.clientY;joy.x=joy.y=0;
+  try{stage.setPointerCapture(e.pointerId);}catch(_){}
+  joyEl.style.left=e.clientX+'px';joyEl.style.top=e.clientY+'px';knob.style.transform='';joyEl.hidden=false;});
+stage.addEventListener('pointermove',e=>{if(e.pointerId!==joy.id)return;let dx=e.clientX-joy.sx,dy=e.clientY-joy.sy;const l=Math.hypot(dx,dy),m=50;
+  if(l>m){dx*=m/l;dy*=m/l;}joy.x=dx/m;joy.y=dy/m;knob.style.transform=`translate(${dx}px,${dy}px)`;});
+function endJoy(e){if(e.pointerId!==joy.id)return;joy.id=null;joy.x=joy.y=0;joyEl.hidden=true;}
+stage.addEventListener('pointerup',endJoy);stage.addEventListener('pointercancel',endJoy);
+
+function inputVec(){let x=0,z=0;
+  if(keys.KeyA||keys.ArrowLeft)x-=1;if(keys.KeyD||keys.ArrowRight)x+=1;if(keys.KeyW||keys.ArrowUp)z-=1;if(keys.KeyS||keys.ArrowDown)z+=1;
+  x+=joy.x;z+=joy.y;const l=Math.hypot(x,z);if(l>1){x/=l;z/=l;}return [x,z,Math.min(1,l)];}
+
+function collide(o,rad){for(const ob of obstacles){const dx=o.x-ob.x,dz=o.z-ob.z,d=Math.hypot(dx,dz),min=ob.r+rad;
+  if(d<min&&d>0.0001){o.x=ob.x+dx/d*min;o.z=ob.z+dz/d*min;}}
+  const d=Math.hypot(o.x,o.z);if(d>50){o.x*=50/d;o.z*=50/d;}}
+
+// ---------- game logic ----------
+function pickUp(p){S.carry=p;p.state='carried';p.root.visible=false;const m=makePart(p.type);m.scale.setScalar(.8);m.position.y=-.2;carryHolder.add(m);
+  p.chip.className='chip carry';kurtSay(p.quip,3);S.kneeT=Math.max(S.kneeT,5);}
+function deliver(){const p=S.carry;S.carry=null;carryHolder.clear();p.state='done';p.chip.className='chip done';S.delivered++;
+  const g=installed[p.type];g.visible=true;g.scale.setScalar(.01);g.userData.pop=0;if(p.type==='wheels')blocks.forEach(b=>b.visible=false);
+  if(S.delivered===pickups.length)startWin();else{say(`<b>${p.label}</b> bolted on. ${S.delivered} of ${pickups.length}.`,2.2);
+    if(S.delivered===1||p.type==='engine'){kurtSay('Looks like this Jeep is leaking oil again.',3.2);S.oilT=18;oil.scale.multiplyScalar(1.15);}}}
+function steal(){const p=S.carry;S.carry=null;carryHolder.clear();const a=rand(0,Math.PI*2);
+  p.x=kurt.position.x+Math.cos(a)*2.5;p.z=kurt.position.z+Math.sin(a)*2.5;const o={x:p.x,z:p.z};collide(o,1);p.x=o.x;p.z=o.z;
+  p.state='world';p.root.visible=true;p.root.position.set(p.x,0,p.z);p.chip.className='chip';
+  S.stun=.9;S.steals++;D.cool=6;D.mode='wander';pickWander();
+  kurtSay(['Rusty! Drop it, you mutt.','Dale, call off your dang dog!','I had that! I HAD that.'][S.steals%3]);S.kneeT=2.8;say('Rusty knocked it loose. Go grab it.',2.2);}
+function startWin(){S.won=true;S.winT=0;scene.add(jeep);jeep.add(kurt);kurt.position.set(-.45,1.15,.42);kurt.rotation.set(0,Math.PI/2,0);
+  legL.rotation.x=legR.rotation.x=-1.4;armL.rotation.x=armR.rotation.x=-1;kurtSay('Come on, girl. Ignore the oil. Come on...',2.4);
+  let best=null;try{best=parseFloat(localStorage.getItem('kurtBest'));}catch(_){}
+  if(!best||S.time<best){best=S.time;try{localStorage.setItem('kurtBest',String(best));}catch(_){}}
+  $('winTime').textContent=fmt(S.time);$('bestTime').textContent=fmt(best);$('steals').textContent=S.steals;
+  $('winLine').textContent=S.steals===0?"Rusty never laid a paw on him. Kurt is insufferable about it.":S.steals<3?"Rusty got a couple licks in. Kurt says it doesn't count.":"Rusty had a great afternoon. Kurt did not.";}
+
+// ---------- loop ----------
+const camPos=new THREE.Vector3(0,14,17),camLook=new THREE.Vector3();
+let last=performance.now();
+function tick(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;const t=now/1000;
+  if(S.running&&!S.won){
+    S.time+=dt;$('timer').textContent=fmt(S.time);
+    let [ix,iz,mag]=inputVec();if(S.stun>0){S.stun-=dt;ix=iz=mag=0;}
+    const speed=5.6*(S.carry?S.carry.weight:1);
+    const o={x:kurt.position.x+ix*speed*dt,z:kurt.position.z+iz*speed*dt};collide(o,.45);kurt.position.x=o.x;kurt.position.z=o.z;
+    if(mag>.05){const target=Math.atan2(ix,iz);let d=target-S.facing;d=Math.atan2(Math.sin(d),Math.cos(d));S.facing+=d*Math.min(1,dt*10);S.walk+=dt*mag*speed*1.6;}
+    kurt.rotation.y=S.facing;
+    const moving=mag>.05,amt=Math.min(1,mag*2);
+    // bad right knee: the right leg barely bends and he lurches on that step
+    const sw=Math.sin(S.walk)*.6*amt;legL.rotation.x=sw;legR.rotation.x=-sw*.45;
+    const lurch=Math.max(0,Math.sin(S.walk))*amt;
+    if(moving){S.idle=0;S.kneeSaid=false;puffT-=dt;if(puffT<=0){puffT=.18;puff(kurt.position.x,kurt.position.z);}}else S.idle+=dt;
+    const rub=!S.carry&&S.idle>2.5;
+    torso.rotation.x=rub?.6:.18;
+    if(S.carry){armL.rotation.x=armR.rotation.x=-2.9;body.position.y=lurch*.09;}
+    else if(rub){armL.rotation.x=.2;armR.rotation.x=-.5;armR.rotation.z=.25;body.position.y=0;legR.rotation.x=-.35;}
+    else{armL.rotation.x=-sw*.7;armR.rotation.x=sw*.4;armR.rotation.z=0;body.position.y=lurch*.1;}
+    kurt.rotation.z=S.stun>0?Math.sin(t*30)*.15:-lurch*.07;
+    if(rub&&!S.kneeSaid){S.kneeSaid=true;kurtSay('My knee hurts. Gimme a second.',2.6);}
+    S.oilT-=dt;if(!S.carry&&S.oilT<=0&&bubbleT<=0&&Math.hypot(kurt.position.x,kurt.position.z)<4.6){kurtSay('Looks like this Jeep is leaking oil again.',3.2);S.oilT=20;}
+    S.kneeT-=dt*(S.carry?1.6-S.carry.weight:1);if(S.kneeT<=0&&bubbleT<=0){knee();S.kneeT=rand(7,12);}
+    // pickups and delivery
+    if(!S.carry&&S.stun<=0){for(const p of pickups){if(p.state==='world'&&Math.hypot(p.x-kurt.position.x,p.z-kurt.position.z)<1.7){pickUp(p);break;}}}
+    if(S.carry&&Math.hypot(kurt.position.x,kurt.position.z)<3.4)deliver();
+    // Rusty
+    const kd=Math.hypot(kurt.position.x-D.x,kurt.position.z-D.z);
+    if(D.cool>0)D.cool-=dt;
+    if(S.carry&&D.cool<=0&&kd<15)D.mode='chase';
+    if(D.mode==='chase'&&(!S.carry||kd>22)){D.mode='wander';pickWander();}
+    let tx=D.mode==='chase'?kurt.position.x:D.tx,tz=D.mode==='chase'?kurt.position.z:D.tz;
+    const dx=tx-D.x,dz=tz-D.z,dd=Math.hypot(dx,dz),ds=D.mode==='chase'?4.7:2.4;
+    if(dd>.3){const o2={x:D.x+dx/dd*ds*dt,z:D.z+dz/dd*ds*dt};collide(o2,.5);D.x=o2.x;D.z=o2.z;dog.rotation.y=Math.atan2(dx,dz);D.walk+=dt*ds*2.5;}
+    else if(D.mode==='wander')pickWander();
+    if(D.mode==='chase'&&S.carry&&kd<1.1)steal();
+  }
+  dog.position.set(D.x,Math.abs(Math.sin(D.walk))*.08,D.z);
+  dogLegs.forEach((l,i)=>l.rotation.x=Math.sin(D.walk+(i%2?Math.PI:0))*.7);
+  tail.rotation.z=Math.sin(t*(D.mode==='chase'?18:6))*.5;
+  // pickups bob
+  pickups.forEach((p,i)=>{if(p.state==='world'){p.model.position.y=.4+Math.sin(t*2+i)*.15;p.model.rotation.y=t*.8+i;}});
+  // install pop
+  Object.values(installed).forEach(g=>{if(g.visible&&g.userData.pop!==undefined&&g.userData.pop<1){g.userData.pop=Math.min(1,g.userData.pop+dt*3);
+    const k=g.userData.pop;g.scale.setScalar(Math.max(.01,(1-Math.pow(1-k,3))*(1+.3*Math.sin(k*Math.PI))));}});
+  // arrow
+  arrow.visible=S.running&&!S.won;
+  if(arrow.visible){let tx=0,tz=0;
+    if(!S.carry){let best=1e9;for(const p of pickups){if(p.state!=='world')continue;const d=Math.hypot(p.x-kurt.position.x,p.z-kurt.position.z);if(d<best){best=d;tx=p.x;tz=p.z;}}}
+    arrow.position.set(kurt.position.x,.15,kurt.position.z);arrow.rotation.y=Math.atan2(tx-kurt.position.x,tz-kurt.position.z);}
+  // win sequence
+  let focus=kurt.position;
+  if(S.won){S.winT+=dt;const w=S.winT;focus=jeep.position;
+    if(w<1.6){jeep.position.y=Math.sin(w*60)*.03;jeep.rotation.z=Math.sin(w*45)*.01;}
+    else{const v=Math.min(18,(w-1.6)*7);jeep.position.y=0;jeep.position.x+=v*dt;
+      installed.wheels.children.forEach(wh=>{if(!wh.userData.spare)wh.rotation.z-=v*dt/.55;});if(w>1.65&&w<1.7)kurtSay('HA! Still got it. My knee still hurts.',3);}
+    if(w>4.2&&$('win').hidden){$('win').hidden=false;S.running=false;}
+  }
+  clouds.forEach(c=>{c.position.x+=dt*.8;if(c.position.x>80)c.position.x=-80;});
+  weeds.forEach(w=>{w.m.position.x+=w.v*dt;w.m.rotation.z-=w.v*dt/.55;w.m.position.y=.55+Math.abs(Math.sin(t*3+w.v))*.4;if(w.m.position.x>48){w.m.position.x=-48;w.m.position.z=rand(-40,40);}});
+  puffs.forEach(p=>{if(p.life>0){p.life-=dt*1.6;p.m.position.y+=dt*.5;p.m.scale.setScalar(1+(1-p.life)*1.5);p.m.material.opacity=Math.max(0,p.life*.5);}});
+  if(bubbleT>0){bubbleT-=dt;if(bubbleT<=0)bubble.hidden=true;else{const hp=new THREE.Vector3();kurt.getWorldPosition(hp);hp.y+=(S.carry?3.4:2.6);hp.project(camera);
+    bubble.style.left=((hp.x+1)/2*innerWidth)+'px';bubble.style.top=((1-hp.y)/2*innerHeight)+'px';}}
+  if(toastT>0){toastT-=dt;if(toastT<=0)$('toast').classList.remove('show');}
+  // camera
+  const wp=new THREE.Vector3();(S.won?jeep:kurt).getWorldPosition(wp);
+  camPos.lerp(new THREE.Vector3(wp.x,wp.y+14,wp.z+15),Math.min(1,dt*4));camLook.lerp(wp,Math.min(1,dt*6));
+  camera.position.copy(camPos);camera.lookAt(camLook);
+  renderer.render(scene,camera);requestAnimationFrame(tick);
+}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;
+  camera.fov=w<h?62:50;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+
+$('startBtn').addEventListener('click',()=>{$('intro').hidden=true;S.running=true;kurtSay("Alright. Let's get this heap running.");S.kneeT=4;});
+$('againBtn').addEventListener('click',()=>{$('win').hidden=true;reset();S.running=true;kurtSay('Who took my Jeep apart? DALE!');S.kneeT=4;});
+reset();requestAnimationFrame(t=>{last=t;tick(t);});
+})();
+</script>
+
+</body>
+</html>
