@@ -78,10 +78,10 @@ button:focus-visible{outline:3px solid var(--cream);outline-offset:3px}
 
 <div class="overlay" id="intro">
   <div class="card">
-    <div class="eyebrow">Dale's Junkyard · Sundown</div>
+    <div class="eyebrow">The Junkyard · Sundown</div>
     <h1>Kurt's Jeep</h1>
     <p>Kurt is 78, stubborn as a fence post, and his knee hurts. He will tell you about it. He came straight from the gym, and his '74 Jeep is sitting on cinder blocks, leaking oil again. Six parts are scattered across the junkyard. Haul them back one at a time.</p>
-    <p>Watch out for Rusty, Dale's dog. He chases anything Kurt is carrying, and heavy parts slow the old man down.</p>
+    <p>Watch out for the junkyard dog. He chases anything Kurt is carrying, and heavy parts slow the old man down.</p>
     <p class="hint">WASD or arrow keys. On a phone, drag anywhere to walk. Follow the yellow arrow.</p>
     <button id="startBtn">Get to work</button>
   </div>
@@ -168,7 +168,7 @@ function barrels(){const g=new THREE.Group();const n=1+Math.floor(Math.random()*
 function stack(){const g=new THREE.Group();const n=2+Math.floor(Math.random()*3);for(let i=0;i<n;i++){const c=[C.rust,0x7a8a92,0x8b6a3a,C.blue,0x6d4c6a][Math.floor(Math.random()*5)];
   const s=bx(3,.55,1.6,c,rand(-.15,.15),.28+i*.56,rand(-.15,.15));s.rotation.y=rand(-.2,.2);g.add(s);g.add(bx(.6,.2,1.3,0x3a3a3a,s.position.x-.9,s.position.y+.15,s.position.z));}return [g,1.9];}
 const makers=[rock,cactus,tires,husk,barrels,stack,rock,barrels];
-// Dale's shack
+// old shack
 {const g=new THREE.Group();g.add(bx(4,2.6,3,C.wood,0,1.3,0));const r=bx(4.6,.15,3.8,C.tin,0,2.85,0);r.rotation.x=.18;g.add(r);
  g.add(bx(.9,1.7,.08,C.dark,.8,.85,1.52));g.add(bx(.9,.6,.06,C.lens,-.9,1.6,1.52));
  const sign=bx(2.6,.6,.08,C.cream||0xf6e7c8,0,3.4,1.2);g.add(sign);g.add(bx(.1,.8,.1,C.dark,-1,3,1.2));g.add(bx(.1,.8,.1,C.dark,1,3,1.2));
@@ -194,6 +194,11 @@ const weeds=[];for(let i=0;i<4;i++){const w=mesh(new THREE.IcosahedronGeometry(.
 const puffs=[];for(let i=0;i<14;i++){const p=new THREE.Mesh(new THREE.IcosahedronGeometry(.18,0),new THREE.MeshStandardMaterial({color:0xe6c597,flatShading:true,transparent:true,opacity:0}));
   scene.add(p);puffs.push({m:p,life:0});}
 let puffI=0,puffT=0;
+const gas=[];for(let i=0;i<16;i++){const p=new THREE.Mesh(new THREE.IcosahedronGeometry(.32,0),new THREE.MeshStandardMaterial({color:i%2?0x8fd14f:0x6fb83a,flatShading:true,transparent:true,opacity:0,depthWrite:false}));
+  scene.add(p);gas.push({m:p,life:0,vx:0,vz:0});}
+function toot(){const bx=-Math.sin(S.facing),bz=-Math.cos(S.facing);
+  gas.forEach((g,i)=>{g.life=1+Math.random()*.6;const sp=rand(.4,1.4);g.vx=bx*sp+rand(-.4,.4);g.vz=bz*sp+rand(-.4,.4);
+    g.m.position.set(kurt.position.x+bx*.45+rand(-.15,.15),rand(.6,1),kurt.position.z+bz*.45+rand(-.15,.15));g.m.scale.setScalar(rand(.5,.9));g.m.rotation.set(rand(0,3),rand(0,3),0);});}
 function puff(x,z){const p=puffs[puffI++%puffs.length];p.life=1;p.m.position.set(x+rand(-.2,.2),.15,z+rand(-.2,.2));p.m.scale.setScalar(1);}
 for(let i=0;i<34;i++){
   let x,z,tries=0;do{const a=rand(0,Math.PI*2),d=rand(8,47);x=Math.cos(a)*d;z=Math.sin(a)*d;tries++;}
@@ -283,7 +288,7 @@ const armL=gymArm(-.47),armR=gymArm(.47);torso.add(armL,armR);
 const cane=cyl(.04,1.1,C.brown,0,-.75,.05,5);armR.add(cane);
 const carryHolder=new THREE.Group();carryHolder.position.set(0,2.5,.1);kurt.add(carryHolder);
 
-// ---------- Rusty ----------
+// ---------- junkyard dog ----------
 const dog=new THREE.Group();scene.add(dog);
 dog.add(bx(.45,.4,1,C.dog,0,.55,0));
 dog.add(bx(.38,.36,.4,C.dog,0,.85,.6));dog.add(bx(.42,.09,.12,C.red,0,.72,.42));dog.add(bx(.08,.08,.03,C.mustard,0,.64,.48));
@@ -315,7 +320,7 @@ function knee(){kurtSay(KNEE[Math.floor(Math.random()*KNEE.length)]);}
 function fmt(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 
 // ---------- state ----------
-const S={oilT:12,kneeT:6,idle:0,kneeSaid:false,running:false,won:false,time:0,carry:null,delivered:0,stun:0,steals:0,winT:0,facing:0,walk:0};
+const S={gasT:9,oilT:12,kneeT:6,idle:0,kneeSaid:false,running:false,won:false,time:0,carry:null,delivered:0,stun:0,steals:0,winT:0,facing:0,walk:0};
 const D={x:-22,z:24,tx:0,tz:0,cool:0,mode:'wander',walk:0};
 
 function reset(){
@@ -324,7 +329,7 @@ function reset(){
   kurt.position.set(0,0,5);kurt.rotation.set(0,0,0);S.facing=Math.PI;S.kneeT=6;S.idle=0;S.kneeSaid=false;torso.rotation.x=.18;armR.rotation.z=0;
   carryHolder.clear();armL.rotation.x=armR.rotation.x=0;
   jeep.position.set(0,0,0);jeep.rotation.set(0,0,0);
-  Object.values(installed).forEach(g=>{g.visible=false;g.scale.set(1,1,1);});oil.scale.set(1.3,.9,1);S.oilT=12;blocks.forEach(b=>b.visible=true);
+  Object.values(installed).forEach(g=>{g.visible=false;g.scale.set(1,1,1);});oil.scale.set(1.3,.9,1);S.oilT=12;S.gasT=9;gas.forEach(g=>{g.life=0;g.m.material.opacity=0;});blocks.forEach(b=>b.visible=true);
   const off=Math.random()*Math.PI*2;
   pickups.forEach((p,i)=>{let x,z,t=0;do{const a=off+i/pickups.length*Math.PI*2+rand(-.3,.3),d=rand(20,43);x=Math.cos(a)*d;z=Math.sin(a)*d;t++;}
     while(t<30&&obstacles.some(o=>Math.hypot(o.x-x,o.z-z)<o.r+1.6));
@@ -366,13 +371,13 @@ function steal(){const p=S.carry;S.carry=null;carryHolder.clear();const a=rand(0
   p.x=kurt.position.x+Math.cos(a)*2.5;p.z=kurt.position.z+Math.sin(a)*2.5;const o={x:p.x,z:p.z};collide(o,1);p.x=o.x;p.z=o.z;
   p.state='world';p.root.visible=true;p.root.position.set(p.x,0,p.z);p.chip.className='chip';
   S.stun=.9;S.steals++;D.cool=6;D.mode='wander';pickWander();
-  kurtSay(['Rusty! Drop it, you mutt.','Dale, call off your dang dog!','I had that! I HAD that.'][S.steals%3]);S.kneeT=2.8;say('Rusty knocked it loose. Go grab it.',2.2);}
+  kurtSay(['Drop it, you mutt!','Get outta here, dog!','I had that! I HAD that.'][S.steals%3]);S.kneeT=2.8;say('The dog knocked it loose. Go grab it.',2.2);}
 function startWin(){S.won=true;S.winT=0;scene.add(jeep);jeep.add(kurt);kurt.position.set(-.45,1.15,.42);kurt.rotation.set(0,Math.PI/2,0);
   legL.rotation.x=legR.rotation.x=-1.4;armL.rotation.x=armR.rotation.x=-1;kurtSay('Come on, girl. Ignore the oil. Come on...',2.4);
   let best=null;try{best=parseFloat(localStorage.getItem('kurtBest'));}catch(_){}
   if(!best||S.time<best){best=S.time;try{localStorage.setItem('kurtBest',String(best));}catch(_){}}
   $('winTime').textContent=fmt(S.time);$('bestTime').textContent=fmt(best);$('steals').textContent=S.steals;
-  $('winLine').textContent=S.steals===0?"Rusty never laid a paw on him. Kurt is insufferable about it.":S.steals<3?"Rusty got a couple licks in. Kurt says it doesn't count.":"Rusty had a great afternoon. Kurt did not.";}
+  $('winLine').textContent=S.steals===0?"That dog never laid a paw on him. Kurt is insufferable about it.":S.steals<3?"The dog got a couple licks in. Kurt says it doesn't count.":"The dog had a great afternoon. Kurt did not.";}
 
 // ---------- loop ----------
 const camPos=new THREE.Vector3(0,14,17),camLook=new THREE.Vector3();
@@ -398,12 +403,13 @@ function tick(now){
     else{armL.rotation.x=-sw*.7;armR.rotation.x=sw*.4;armR.rotation.z=0;body.position.y=lurch*.1;}
     kurt.rotation.z=S.stun>0?Math.sin(t*30)*.15:-lurch*.07;
     if(rub&&!S.kneeSaid){S.kneeSaid=true;kurtSay('My knee hurts. Gimme a second.',2.6);}
+    S.gasT-=dt;if(S.gasT<=0&&bubbleT<=0){kurtSay('This is what I think about this place.',3);toot();S.gasT=rand(20,32);}
     S.oilT-=dt;if(!S.carry&&S.oilT<=0&&bubbleT<=0&&Math.hypot(kurt.position.x,kurt.position.z)<4.6){kurtSay('Looks like this Jeep is leaking oil again.',3.2);S.oilT=20;}
     S.kneeT-=dt*(S.carry?1.6-S.carry.weight:1);if(S.kneeT<=0&&bubbleT<=0){knee();S.kneeT=rand(7,12);}
     // pickups and delivery
     if(!S.carry&&S.stun<=0){for(const p of pickups){if(p.state==='world'&&Math.hypot(p.x-kurt.position.x,p.z-kurt.position.z)<1.7){pickUp(p);break;}}}
     if(S.carry&&Math.hypot(kurt.position.x,kurt.position.z)<3.4)deliver();
-    // Rusty
+    // junkyard dog
     const kd=Math.hypot(kurt.position.x-D.x,kurt.position.z-D.z);
     if(D.cool>0)D.cool-=dt;
     if(S.carry&&D.cool<=0&&kd<15)D.mode='chase';
@@ -437,6 +443,8 @@ function tick(now){
   }
   clouds.forEach(c=>{c.position.x+=dt*.8;if(c.position.x>80)c.position.x=-80;});
   weeds.forEach(w=>{w.m.position.x+=w.v*dt;w.m.rotation.z-=w.v*dt/.55;w.m.position.y=.55+Math.abs(Math.sin(t*3+w.v))*.4;if(w.m.position.x>48){w.m.position.x=-48;w.m.position.z=rand(-40,40);}});
+  gas.forEach(g=>{if(g.life>0){g.life-=dt*.45;g.m.position.x+=g.vx*dt;g.m.position.z+=g.vz*dt;g.m.position.y+=dt*.35;g.vx*=.97;g.vz*=.97;
+    g.m.scale.multiplyScalar(1+dt*.9);g.m.rotation.y+=dt;g.m.material.opacity=Math.max(0,Math.min(.75,g.life*.75));}});
   puffs.forEach(p=>{if(p.life>0){p.life-=dt*1.6;p.m.position.y+=dt*.5;p.m.scale.setScalar(1+(1-p.life)*1.5);p.m.material.opacity=Math.max(0,p.life*.5);}});
   if(bubbleT>0){bubbleT-=dt;if(bubbleT<=0)bubble.hidden=true;else{const hp=new THREE.Vector3();kurt.getWorldPosition(hp);hp.y+=(S.carry?3.4:2.6);hp.project(camera);
     bubble.style.left=((hp.x+1)/2*innerWidth)+'px';bubble.style.top=((1-hp.y)/2*innerHeight)+'px';}}
@@ -452,7 +460,7 @@ function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);c
 addEventListener('resize',resize);resize();
 
 $('startBtn').addEventListener('click',()=>{$('intro').hidden=true;S.running=true;kurtSay("Alright. Let's get this heap running.");S.kneeT=4;});
-$('againBtn').addEventListener('click',()=>{$('win').hidden=true;reset();S.running=true;kurtSay('Who took my Jeep apart? DALE!');S.kneeT=4;});
+$('againBtn').addEventListener('click',()=>{$('win').hidden=true;reset();S.running=true;kurtSay('Who took my Jeep apart AGAIN?');S.kneeT=4;});
 reset();requestAnimationFrame(t=>{last=t;tick(t);});
 })();
 </script>

@@ -1,6 +1,6 @@
 # Kurt's Jeep
 
-A little low-poly 3D game. Kurt is 78, his knee hurts, and his '74 Jeep is leaking oil again. Haul six parts back across Dale's junkyard before Rusty the dog steals them.
+A little low-poly 3D game. Kurt is 78, his knee hurts, and his '74 Jeep is leaking oil again. Haul six parts back across the junkyard and get it running, without letting the junkyard dog steal anything.
 
 **Play:** https://stonecoldos.github.io/Kurt-s-Jeep/
 
